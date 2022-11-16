@@ -18,11 +18,32 @@ A Workspace is some kind of Desk which is dedicated for a working concern. Like 
 
 A workspace is declared as follows:
 
-| Attribute                | DataType                | Semantic                                                     |
-| ------------------------ | ----------------------- | ------------------------------------------------------------ |
-| workspaceKey             | string                  | an identifier which is used to address a workspace (also used for url's and routing) |
-| defaultStaticUseCaseKeys | string-array (optional) | 0..* useCaseKeys that should be permanently present within the workspace (there will be no way to terminate them). If a workspace can be navigated via menu entry, then it makes sense, that is will not appear empty when its initially shown. |
-| isSidebar                | boolean (optional)      | if true, then the workspace will be displayed as a collapsible Sidebar on the right side of the application instead of the main area. |
+| Attribute                    | DataType                | Semantic                                                     |
+| ---------------------------- | ----------------------- | ------------------------------------------------------------ |
+| workspaceKey                 | string                  | an identifier which is used to address a workspace (also used for url's and routing) |
+| ~~defaultStaticUseCaseKeys~~ | string-array (optional) | ~~0..* useCaseKeys that should be permanently present within the workspace (there will be no way to terminate them). If a workspace can be navigated via menu entry, then it makes sense, that is will not appear empty when its initially shown.~~ OBSOLETE! static usecases now assigned using a separate section (see below) |
+| ~~isSidebar~~                | boolean (optional)      | ~~if true, then the workspace will be displayed as a collapsible Sidebar on the right side of the application instead of the main area.~~ OBSOLETE: use "workspaceAppearence=sidebar" instead |
+| workspaceAppearance          | string (optional)       | "default" (in center area) \| "sidebar" \| "modal"           |
+| usecaseAppearance            | string (optional)       | "tabs" \| "flow" \| "dashboard"                              |
+
+#### Sidebar
+
+When enabling a workspace to be displayed in the sidebar, the default value for usecaseAppearance will be "flow" otherwise it would be "tabs". Note that just enabling the sidebar appearance will not automatically add a button to show the sidebar! The application will only have one button to expand a sidebar quickly, and this button is reserved for the workspace with the well-known workspaceKey "sidebar"! Anyone can add own static usecases to this common sidebar workspace (thats why we changed the way of declaration for that), but for own additional sidebars there must be declared a dedicated command for opening them.
+
+#### Home
+
+In default the initial view of the shell (except if a login is required) is the "home"-workspace. Which workspace to use (changing the name) can be overwritten in the application portfolio configuration (see "landingWorkspaceKey").
+
+A Click on the logo/app-title will also navigate to this workspace.
+
+Beside of "home" here are some suggestions for well-known workspace-names (navigatable via the user-menu ("MY")):
+
+* "config": application configuration
+* "settings": user scoped settings
+* "account": user account information
+* "legal": legal-notes, terms of use, licensing
+* "help": help and documentations
+* "debug": developer tools and diagnostic helpers
 
 ### what is a 'UseCase'
 
@@ -136,7 +157,7 @@ Initiates UI navigation to a workspace route including the initialization of "St
 
 | Attribute              | DataType          | Semantic                                                     |
 | ---------------------- | ----------------- | ------------------------------------------------------------ |
-| targetWorkspaceKey     | string (optional) | addresses the workspace to add the workspace to. if no workspace is provided, then the usecase will start in form of a modal dialog |
+| targetWorkspaceKey     | string (optional) | addresses the workspace to add the workspace to. if no workspace is provided, then the usecase will start in form of a modal dialog. "." can be used to address the parent  workspace of the current usecase (only if the command is  useCase scoped) |
 | useCaseKey             | string            | the usecase to start (or activate if it is a singleton-usecase) |
 | useCaseArgumentMapping | dictionary        | maps attribute names from the ambient state of the current usecase scope to input parameter names for the usecase that is started. Sample: *{ "itemIdToEdit":"selectedItemId" }* |
 
@@ -177,6 +198,18 @@ This command...
 ### UseCase Argument passing
 
 see the 'useCaseArgumentMapping' as explained above...
+
+### "Static" UseCases
+
+If a workspace can be navigated via menu entry, then it makes sense, that it will not appear empty when its initially shown.  So static usecases are permanently present within a workspace (there will be no way to terminate them, and they are present directly when accessing a workspace). This can be declared using an "staticUseCaseAssignment" structure in the following way:
+
+
+
+| Attribute          | DataType              | Semantic                                                     |
+| ------------------ | --------------------- | ------------------------------------------------------------ |
+| useCaseKey         | string                | the usecase to be present                                    |
+| targetWorkspaceKey | string                | addresses the workspace that should contain the usecase      |
+| useCaseArguments   | dictionary (optional) | default arguments for the usecase (may be for scoping the displayed data) |
 
 
 
@@ -254,10 +287,11 @@ The decision, which strategy is used is related to the syntax, how the *'widgetC
   "legalContactMdUrl": "legal-contact.md",
   "licenseAgreementMdUrl": "license-agreement.md",
   "moduleDescriptionUrls": [
-    "./oob-modules/xxxxx.core.module.json"
+    "https://any-external-source/module.json",
+    "https://another-source/module.json"
   ],
   "intialRuntimeTags": ["Prod"],
-  "landingWorkspaceName": "workspace-1"
+  "landingWorkspaceKey": "home"
 }
 ```
 
@@ -290,6 +324,9 @@ The decision, which strategy is used is related to the syntax, how the *'widgetC
     ... see description above ...
   ],
   "useCases": [
+    ... see description above ...
+  ],
+  "staticUseCaseAssignments": [
     ... see description above ...
   ],
   "commands":[
