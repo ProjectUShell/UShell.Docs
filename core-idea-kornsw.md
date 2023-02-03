@@ -58,14 +58,14 @@ Within the application, a UseCase represents a transaction scope which
 
 A usecase is declared as follows:
 
-| Attribute        | DataType              | Semantic                                                     |
-| ---------------- | --------------------- | ------------------------------------------------------------ |
-| useCaseKey       | string                | an identifier which is used to address a usecase             |
-| title            | string                | is used as label for the tab, representing the usecase. Its also possible to use placeholders with the name of a state attribute (sample: *'Details of Record #{recordIdToEdit}'*) |
-| instanceKey      | string (optional)     | used to control concurrency of identical UseCases - this is described in detail below... the default is *'{uid}'* |
-| widgetClass      | string                | the widget which should be used in the UI. for detail see section 'Remote-Widgets' below |
-| useCaseArguments | dictionary (optional) | defined which input arguments are required (with *null* as value) or optional with a default value (sample: *'{ "recordToEditId": null, "showAdvancedFields":false}'*). |
-| icon             | string                | key of an icon to be displayed in the tab                    |
+| Attribute          | DataType              | Semantic                                                     |
+| ------------------ | --------------------- | ------------------------------------------------------------ |
+| useCaseKey         | string                | an identifier which is used to address a usecase             |
+| title              | string                | is used as label for the tab, representing the usecase. Its also possible to use placeholders with the name of a state attribute (sample: *'Details of Record #{recordIdToEdit}'*) |
+| instanceKey        | string (optional)     | used to control concurrency of identical UseCases - this is described in detail below... the default is *'{uid}'* |
+| widgetClass        | string                | the widget which should be used in the UI. for detail see section 'Remote-Widgets' below |
+| unitOfWorkDefaults | dictionary (optional) | defines which fields the workingState of a usecase should contain  (sample: *'{ "recordToEditId": null, "showAdvancedFields":false}'*). This values can be overwritten with individual valvues passed by the command, which is initiating a usecase. |
+| icon               | string                | key of an icon to be displayed in the tab                    |
 
 
 
@@ -155,11 +155,11 @@ Initiates UI navigation to a workspace route including the initialization of "St
 
 ### The "start-usecase"-Command
 
-| Attribute              | DataType          | Semantic                                                     |
-| ---------------------- | ----------------- | ------------------------------------------------------------ |
-| targetWorkspaceKey     | string (optional) | addresses the workspace to add the workspace to. if no workspace is provided, then the usecase will start in form of a modal dialog. "." can be used to address the parent  workspace of the current usecase (only if the command is  useCase scoped) |
-| useCaseKey             | string            | the usecase to start (or activate if it is a singleton-usecase) |
-| useCaseArgumentMapping | dictionary        | maps attribute names from the ambient state of the current usecase scope to input parameter names for the usecase that is started. Sample: *{ "itemIdToEdit":"selectedItemId" }* |
+| Attribute          | DataType          | Semantic                                                     |
+| ------------------ | ----------------- | ------------------------------------------------------------ |
+| targetWorkspaceKey | string (optional) | addresses the workspace to add the workspace to. if no workspace is provided, then the usecase will start in form of a modal dialog. "." can be used to address the parent  workspace of the current usecase (only if the command is  useCase scoped) |
+| useCaseKey         | string            | the usecase to start (or activate if it is a singleton-usecase) |
+| initUnitOfWork     | dictionary        | Provides values to be passed as initial state for the UOW for the new usecase instance. There values can be hard coded and/or mapped using the 'mapDynamic'-Approach |
 
 
 
@@ -209,7 +209,7 @@ If a workspace can be navigated via menu entry, then it makes sense, that it wil
 | ------------------ | --------------------- | ------------------------------------------------------------ |
 | useCaseKey         | string                | the usecase to be present                                    |
 | targetWorkspaceKey | string                | addresses the workspace that should contain the usecase      |
-| useCaseArguments   | dictionary (optional) | default arguments for the usecase (may be for scoping the displayed data) |
+| initUnitOfWork     | dictionary (optional) | Provides values to be passed as initial state for the UOW for the new usecase instance. There values can be hard coded and/or mapped using the 'mapDynamic'-Approach |
 
 
 
@@ -291,7 +291,11 @@ The decision, which strategy is used is related to the syntax, how the *'widgetC
     "https://another-source/module.json"
   ],
   "intialRuntimeTags": ["Prod"],
-  "landingWorkspaceKey": "home"
+  "landingWorkspaceKey": "home".
+  "applicationScope" : {
+     "Tenant": "Foo",
+     "Product": "Bar"
+  }
 }
 ```
 
