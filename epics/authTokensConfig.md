@@ -130,6 +130,7 @@ The logon overlay will open an **IFRAME** displaying the *authEndpointUrl* (with
 "additionalRetrieveArgs":{
     ...
 },
+"authEndpointSupportsIFrame": true,
 "retrieveViaGet": false
 ```
 
