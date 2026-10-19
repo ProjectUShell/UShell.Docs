@@ -16,6 +16,7 @@ ownership, priority and compatibility risk.
 | RF | ReactFrontend |
 | CC | CommonComponents.JS |
 | SC | ServerCommands.Contract |
+| FB | FrontendBundle |
 | DOC | UShell.Docs |
 
 **Priority:** P1 = core of the target paradigm (dynamics, data/auth, scope, server commands), P2 = completes the paradigm, P3 = polish.
@@ -97,6 +98,21 @@ ownership, priority and compatibility risk.
 | UB-71 | Legal contact, user agreement (with RuntimeTag), cookie/storage notice from portfolio URLs | RF | P3 | additive | shell-runtime §3 |
 | UB-72 | Central keyboard shortcuts and focus handling | RF | P3 | additive | shell-runtime §3 |
 
+## Epic H - Hosting
+
+| ID | Item | Layers | Prio | Compat | Skill |
+|---|---|---|---|---|---|
+| UB-80 | Pattern-based injection of base href and `portfolioLocation` meta, independent of minification | FB | P2 | additive | hosting §3 |
+| UB-81 | Cache-header defaults for embedded shell and module bundles (`no-cache` for html/json/`remoteEntry.js`) | FB | P3 | additive | hosting §3 |
+| UB-82 | Keep the source URL per module description; resolve relative URLs in `module.json` against it | RF | P1 | ⚠ | hosting §4 |
+| UB-83 | Implement `tryGetModuleBaseUrl` on top of UB-82 | MB, RF | P2 | additive | hosting §4, widget-contract §2 |
+| UB-84 | Starter template with `publicPath: "auto"`, `module.json` in the React project and canonical layout (extends UB-52) | DOC | P2 | - | hosting §4, §5 |
+
+Handoffs to UniversalBFF (owned and tracked there, listed for visibility):
+
+- Module providers register the embedded `module.json` of the React build and only supplement host-bound values (D-09); embed the build output in every configuration, including `module.json`.
+- User-management reference module: replace C#-built description and `WidgetClass = "demo"`, rename federation `srViewer`, remove `backendApiUrl` from the UnitOfWork.
+
 ## Open design decisions
 
 | ID | Question | Affects |
@@ -109,6 +125,8 @@ ownership, priority and compatibility risk.
 | D-06 | Host API namespace, envelope format, security switch | UB-40..42 |
 | D-07 | `TargetWorkspacePath` vs. `TargetWorkspaceKey` | UB-06 |
 | D-08 | Where the `userInput`, confirmation and progress dialogs live (CC primitives used by RF) | UB-07, UB-10, UB-32 |
+| D-09 | Exact set of host-bound values a host may supplement in `module.json`, and the mechanism (server-side overlay vs. separate host document) | UB-82, UniversalBFF |
+| D-10 | Canonical module layout (`module.json`, `ui/`, `api/v{n}/`) mandatory or recommended | UB-84 |
 
 ## Suggested order
 

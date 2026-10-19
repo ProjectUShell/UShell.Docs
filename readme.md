@@ -22,6 +22,7 @@ back here.
 | [`.agents/skills/ushell-data-auth-scope`](.agents/skills/ushell-data-auth-scope/SKILL.md) | Datastores/datasources/services, token sources, seamless token refresh, ApplicationScope via UJMW side channels |
 | [`.agents/skills/ushell-server-commands`](.agents/skills/ushell-server-commands/SKILL.md) | Asynchronous server-executed commands |
 | [`.agents/skills/ushell-host-api`](.agents/skills/ushell-host-api/SKILL.md) | JavaScript Host API for embedding into .NET WebView hosts |
+| [`.agents/skills/ushell-hosting`](.agents/skills/ushell-hosting/SKILL.md) | Hostability contract of shell and module bundles, canonical module layout, delivery via UniversalBFF, static hosting, FrontendBundle.Mvc, WebView |
 | [`.agents/skills/ushell-shell-runtime`](.agents/skills/ushell-shell-runtime/SKILL.md) | Layer requirements for the ReactFrontend harness, consolidated status |
 | [`.agents/skills/ushell-common-components`](.agents/skills/ushell-common-components/SKILL.md) | Layer requirements for CommonComponents |
 | [`.agents/skills/ushell-module-development`](.agents/skills/ushell-module-development/SKILL.md) | Building new modules and module bundles from scratch |

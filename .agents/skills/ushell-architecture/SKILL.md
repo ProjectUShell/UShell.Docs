@@ -204,6 +204,7 @@ instead of building local infrastructure.
 | `ushell-data-auth-scope` | Datastores, datasources, services, FUSE access, token sources, seamless token refresh, ApplicationScope propagation over UJMW side channels |
 | `ushell-server-commands` | Server-executed asynchronous actions, their command type, progress UI and backend contract |
 | `ushell-host-api` | Embedding the shell into a .NET WebView (or another host) and controlling it from outside via JavaScript |
+| `ushell-hosting` | Hostability contract of shell and module bundles (base path, publicPath, module.json as React artifact, relative URL resolution, canonical module layout) and how UniversalBFF, static hosting, FrontendBundle.Mvc and WebView hosts deliver them |
 | `ushell-shell-runtime` | Requirements for the ReactFrontend harness layer: what the shell itself must implement |
 | `ushell-common-components` | Requirements for the CommonComponents layer: what is generic, what is UI-specific, what must not go there |
 | `ushell-module-development` | Building a new U-Shell module from scratch (declarative module, module bundle with widgets and/or data providers) |

@@ -49,8 +49,11 @@ Most modules need no bundle.
 
 ## 4. Hosting
 
-- `module.json` is a plain HTTP GET resource: static file, ASP.NET controller (`PortfolioHosting.Mvc`), or UniversalBFF.
-- A module bundle is static content (`remoteEntry.js` + chunks); CORS must allow the shell origin.
+The hostability contract and the delivery variants are owned by `ushell-hosting`. In short:
+
+- `module.json` is a plain HTTP GET resource. In the target state it is an artifact of the module's React project (when a bundle exists), served under the module base URL; the main delivery path is UniversalBFF (assembly with embedded build output).
+- A module bundle is static content (`remoteEntry.js` + chunks), built with `publicPath: "auto"`; CORS must allow the shell origin.
+- URLs inside `module.json` are relative to the `module.json` URL (canonical layout `module.json`, `ui/`, `api/v{n}/`).
 - Backends that serve the module's datastores and services use UJMW (FUSE repository endpoints, service controllers, server command executor). They restore ApplicationScope from the UJMW side channel via SmartAmbience.
 
 ## 5. Checklist before calling a module done

@@ -50,7 +50,7 @@ know the source of every command, event and state change.
 | ApplicationScope | *(exists on class only)* `getApplicationScopeValues()`, `switchScope(key, value)` | Read the current values; request a switch (shell validates). |
 | RuntimeTags | *(new)* `getRuntimeTags()` | Read-only. Changing tags goes through commands. |
 | Navigation helpers | *(exists on class only)* `pushBreadcrumbItem`, `forceBreadcrumbItem` | Shell-owned breadcrumb for widgets with internal navigation. |
-| Resources | `tryGetModuleBaseUrl(usecaseKey)` | Module-relative assets. |
+| Resources | *(declared, not implemented)* `tryGetModuleBaseUrl(usecaseKey)` | Module-relative assets, resolved against the module's `module.json` URL (UB-82, UB-83, see `ushell-hosting`). |
 | Layout preference | `allignWidgetNavPanelLeft` | Global preference for a widget's own nav panel side. |
 | Logging | *(new)* `log` facade | Central logging; widgets do not build logging islands. |
 
