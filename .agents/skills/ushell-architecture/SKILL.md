@@ -33,6 +33,7 @@ Rules for this structure:
 - The **status quo** is evidence with a date and commit SHAs. It ages; re-verify against code before relying on it.
 - When a refactoring is completed, delete the status/refactoring block and keep only the target state.
 - The cross-repository work list lives in `doc/backlog.md`. Skills reference backlog IDs (`UB-xx`).
+- What the productive code does **against** the target state is inventoried in `ushell-design-debt` (`DD-xx`). Load it whenever you write against the running shell rather than against the target state.
 
 ## 2. Vision
 
@@ -209,6 +210,7 @@ instead of building local infrastructure.
 | `ushell-common-components` | Requirements for the CommonComponents layer: what is generic, what is UI-specific, what must not go there |
 | `ushell-module-development` | Building a new U-Shell module from scratch (declarative module, module bundle with widgets and/or data providers) |
 | `ushell-legacy-integration` | Evolving existing (legacy) implementations onto the target state, integrating legacy applications, porting features from older generations (Angular prototype, CtExpert) |
+| `ushell-design-debt` | Touching productive shell behavior, writing a `module.json` against built-in widgets, or judging whether something may be changed: the inventory of known debt, undocumented conventions and contract violations |
 
 ## 10. Human documentation
 

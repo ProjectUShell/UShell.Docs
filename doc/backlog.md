@@ -104,14 +104,31 @@ ownership, priority and compatibility risk.
 |---|---|---|---|---|---|
 | UB-80 | Pattern-based injection of base href and `portfolioLocation` meta, independent of minification | FB | P2 | additive | hosting §3 |
 | UB-81 | Cache-header defaults for embedded shell and module bundles (`no-cache` for html/json/`remoteEntry.js`) | FB | P3 | additive | hosting §3 |
-| UB-82 | Keep the source URL per module description; resolve relative URLs in `module.json` against it | RF | P1 | ⚠ | hosting §4 |
-| UB-83 | Implement `tryGetModuleBaseUrl` on top of UB-82 | MB, RF | P2 | additive | hosting §4, widget-contract §2 |
+| UB-82 | Carry the source URL per module description (contract property instead of `any` cast) and extend resolution to datastore/datasource/service URLs. Relative **widget** URLs already resolve, see DD-06, DD-07 | PD, RF | P1 | ⚠ | hosting §4 |
+| UB-83 | `tryGetModuleBaseUrl`: done in ReactFrontend, still missing in `LocalWidgetHost`; disambiguate the lookup once modules stay addressable (UB-86) | MB, CC | P2 | additive | hosting §4, widget-contract §2 |
 | UB-84 | Starter template with `publicPath: "auto"`, `module.json` in the React project and canonical layout (extends UB-52) | DOC | P2 | - | hosting §4, §5 |
 
 Handoffs to UniversalBFF (owned and tracked there, listed for visibility):
 
 - Module providers register the embedded `module.json` of the React build and only supplement host-bound values (D-09); embed the build output in every configuration, including `module.json`.
 - User-management reference module: replace C#-built description and `WidgetClass = "demo"`, rename federation `srViewer`, remove `backendApiUrl` from the UnitOfWork.
+
+## Epic I - Consolidation of known design debt
+
+Derived from the inventory in `.agents/skills/ushell-design-debt` (`DD-xx`). These items make
+the productive implementation match the target state. Each one is additive or alias-guarded;
+U-Shell is in productive use.
+
+| ID | Item | Layers | Prio | Compat | Debt |
+|---|---|---|---|---|---|
+| UB-85 | Complete the public surface of `ushell-common-components` (`LocalWidgetHost`, `GuifadModule`, `EntityTableModule`, `EntitySelection`, `Dialog`, `Notification`, `LoadingScreen`, `ErrorScreen`, schema-editor, dashboard, card-board, `src/data` connectors); remove the shell's `dist/cjs` deep imports afterwards | CC, RF | P1 | additive | DD-04, DD-05 |
+| UB-86 | Keep modules addressable after loading instead of merging into one description; prerequisite for per-module overlays and an unambiguous `tryGetModuleBaseUrl` | RF | P1 | ⚠ | DD-06, DD-07, DD-08 |
+| UB-87 | Document and then align the UnitOfWork contract of the built-in widgets; additive alias for `rootEntityName` vs. `entityName`, never a rename | DOC, RF | P2 | alias | DD-02 |
+| UB-88 | Datastore-based variant beside `guifadFuse` so no widget takes a backend URL from the UnitOfWork; keep the old behavior while portfolios use it | CC, RF | P2 | alias | DD-03 |
+| UB-89 | Declare the module base path as an optional property of `UsecaseDescription` (.NET and TS together), replacing the `any` cast | PD | P2 | additive | DD-06 |
+| UB-90 | Normalize built-in widget name resolution (case handling) while introducing the widget registry of UB-17 | RF | P3 | alias | DD-15 |
+| UB-91 | Add the `include-additional-mandatory-skills` copy to ReactFrontend, CommonComponents.JS and ModuleBase.JS | RF, CC, MB | P3 | - | DD-18 |
+| UB-92 | Re-verify every status block against code at a fixed cadence; record the verification date | DOC | P3 | - | DD-17 |
 
 ## Open design decisions
 

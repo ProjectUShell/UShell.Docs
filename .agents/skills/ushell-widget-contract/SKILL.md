@@ -65,7 +65,9 @@ working, and new widgets degrade gracefully on older shells.
   - `getAccessToken` returns the stored token without renewal.
   - The class is **not bound** to a use-case instance, so `fireEvent` passes no source UoW.
   - It has extra public members that are not part of the interface: `getApplicationScope`, `getApplicationScopeValues`, `switchScope`, `pushBreadcrumbItem`, `forceBreadcrumbItem`, static `fireEvent1`. Widgets can only reach them by casting.
-- CommonComponents provides `LocalWidgetHost` for running widgets outside the shell.
+- `tryGetModuleBaseUrl` **is implemented** in ReactFrontend (corrected 2026-10-19): it finds the use case in the merged module description and returns the module base path that `PortfolioLoader` assigned to it. The lookup is by `usecaseKey` over all modules, so it is ambiguous when two modules use the same key (DD-08).
+- CommonComponents provides `LocalWidgetHost` for running widgets outside the shell, but it is **not exported** from the package, so module authors cannot use it (DD-04).
+- Built-in widgets rendered by the shell receive the prop `widget`; federated remote widgets receive `inputData` (DD-01).
 - ReactFrontend consumes `ushell-modulebase` `^1.0.25`.
 
 ### Refactoring & compatibility

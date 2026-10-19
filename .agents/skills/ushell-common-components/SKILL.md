@@ -29,25 +29,40 @@ Components interact with the shell only through what they are given: props, an `
 
 ## 2. Expected component catalog (configuration-first coverage)
 
-| Capability | Target | Status 2026-10-19 |
-|---|---|---|
-| Table with paging, sorting, column filters, debounced search | generic over `IDataSource` | ✅ `components/Table`, filter molecules, `SearchBar` |
-| Generic entity browser/editor incl. master-detail and relations | `guifad` family, driven by FUSE schema | ✅ `Guifad`, `GuifadFuse`, `GuifadModule`, `EntityTableModule` |
-| CRUD overview pattern: list + side panel for create / edit / delete-confirm, validation issues block submit, error inside the panel, reload after close | part of the entity browser | ❓ verify coverage against this pattern (from CtExpert legacy) |
-| Entity reference labels (FK display, select options) via `getEntityRefs` with caching | generic resolver | ❓ verify (UB-50) |
-| Entity selection (pick a record) | `EntitySelection` | ✅ |
-| Reports | `components/report` | ✅ |
-| Dashboard, card board | `components/dashboard`, `card-board` | ✅ |
-| Schema editor | `components/schema-editor` | ✅ |
-| Charts | generic chart widget | ❓ |
-| PDF viewing | generic viewer | ❌ |
-| Log viewer | generic viewer | ❌ |
-| Dialog, notification, loading/error screens | primitives | ✅ `Dialog`, `Notification`, `LoadingScreen`, `ErrorScreen` |
-| Confirmation dialog for commands | primitive used by the shell | ❓ (UB-10) |
-| `userInput://` dialog (typed fields, collected per command) | generic form dialog | ❌ (UB-07) |
-| Server command progress/notification area | generic progress UI | ❌ (UB-32) |
-| QR code display (and optionally scan) | generic component; reference port of the legacy QR widget | ❌ (UB-61) |
-| Wizard mechanics | generic step container driven by UoW | ❌ |
+"Exists" and "usable by a module bundle" are two different things: only what
+`src/index.tsx` exports is reachable through npm `ushell-common-components`. The `Exported`
+column states that separately. A ❌ there is design debt DD-04, not a missing component.
+
+| Capability | Target | Status 2026-10-19 | Exported |
+|---|---|---|---|
+| Table with paging, sorting, column filters, debounced search | generic over `IDataSource` | ✅ `components/Table`, filter molecules, `SearchBar` | ✅ `Table`, `MultiSelectFilter` |
+| Generic entity browser/editor incl. master-detail and relations | `guifad` family, driven by FUSE schema | ✅ `Guifad`, `GuifadFuse`, `GuifadModule`, `EntityTableModule` | partly: `Guifad`, `GuifadFuse`, `EntityForm`, `EntityTable` yes; `GuifadModule`, `EntityTableModule` **no** |
+| CRUD overview pattern: list + side panel for create / edit / delete-confirm, validation issues block submit, error inside the panel, reload after close | part of the entity browser | ❓ verify coverage against this pattern (from CtExpert legacy) | - |
+| Entity reference labels (FK display, select options) via `getEntityRefs` with caching | generic resolver | ❓ verify (UB-50) | - |
+| Entity selection (pick a record) | `EntitySelection` | ✅ | ❌ |
+| Reports | `components/report` | ✅ | ✅ |
+| Dashboard, card board | `components/dashboard`, `card-board` | ✅ | ❌ |
+| Schema editor | `components/schema-editor` | ✅ | ❌ |
+| Charts | generic chart widget | ❓ | ❌ |
+| PDF viewing | generic viewer | ❌ | - |
+| Log viewer | generic viewer | ❌ | - |
+| Dialog, notification, loading/error screens | primitives | ✅ `Dialog`, `Notification`, `LoadingScreen`, `ErrorScreen` | ❌ |
+| Stand-alone widget harness | `LocalWidgetHost` | ✅ | ❌ **blocks the documented module workflow** |
+| Confirmation dialog for commands | primitive used by the shell | ❓ (UB-10) | - |
+| `userInput://` dialog (typed fields, collected per command) | generic form dialog | ❌ (UB-07) | - |
+| Server command progress/notification area | generic progress UI | ❌ (UB-32) | - |
+| QR code display (and optionally scan) | generic component; reference port of the legacy QR widget | ❌ (UB-61) | - |
+| Wizard mechanics | generic step container driven by UoW | ❌ | - |
+
+### The public surface is part of the layer contract
+
+A component that exists but is not exported is not available to this layer's consumers. The
+shell currently works around that by deep-importing `ushell-common-components/dist/cjs/...`
+(DD-05); a module bundle must not copy that, because a deep CJS import can pull a second React
+instance into a federated bundle (M-5 in `ushell-hosting`).
+
+Completing the export surface is additive and therefore always safe. See UB-85 and the
+repository skill `ushell-common-components-development` for the mechanics.
 
 ## 3. Data connectors and transport duties
 

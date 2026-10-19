@@ -27,6 +27,7 @@ back here.
 | [`.agents/skills/ushell-common-components`](.agents/skills/ushell-common-components/SKILL.md) | Layer requirements for CommonComponents |
 | [`.agents/skills/ushell-module-development`](.agents/skills/ushell-module-development/SKILL.md) | Building new modules and module bundles from scratch |
 | [`.agents/skills/ushell-legacy-integration`](.agents/skills/ushell-legacy-integration/SKILL.md) | Evolving and integrating legacy implementations, findings from earlier generations |
+| [`.agents/skills/ushell-design-debt`](.agents/skills/ushell-design-debt/SKILL.md) | Inventory of known design debt and undocumented conventions of the productive implementation (`DD-xx`) |
 | [`doc/backlog.md`](doc/backlog.md) | Cross-repository backlog and open design decisions |
 | [`core-idea-kornsw.md`](core-idea-kornsw.md) | Original concept (2019), frozen, externally deep-linked |
 | [`epics/`](epics/) | Historical concept epics (`mapDynamic`, token configuration) |
@@ -50,3 +51,8 @@ start with `ushell-architecture`, load the matching domain skills, and then the 
 the repository they change. Each domain skill separates the **target state** from a dated
 **status quo** and the required **refactoring**. Never break existing consumers: every change
 to contracts and runtime behavior must stay backwards compatible.
+
+U-Shell is in productive use and was built with a focus on getting finished, so the code and
+the target state differ in places. Those differences are inventoried in `ushell-design-debt`:
+load it whenever you write against the running shell rather than against the target state. It
+is a running inventory, not a to-do list - the backlog decides what gets resolved and when.

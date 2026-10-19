@@ -36,8 +36,11 @@ Most modules need no bundle.
 - **Data providers** (target): a bundle registers additional `ProviderClass` names for datastores/datasources. The module description then uses them like built-in ones.
 
 ### Status quo
-- Remote widgets are loaded by `FederatedComponentProxy` and receive **one prop `inputData`**, which carries the `IWidget` (`state` + `widgetHost`). Write remote widgets against that prop name.
-- Built-in widgets are selected by name in `WorkspaceManager.renderWidget`.
+- Remote widgets are loaded by `FederatedComponentProxy` and receive **one prop `inputData`**, which carries the `IWidget` (`state` + `widgetHost`). Write remote widgets against that prop name. The built-in wrappers inside CommonComponents use a different prop (`widget`), so they are not a template for a remote widget - see DD-01.
+- Built-in widgets are selected by name in `WorkspaceManager.renderWidget`. Each one reads a fixed, undocumented set of UoW fields; the table in `ushell-design-debt` DD-02 is the contract a `module.json` writes against.
+- **Stand-alone development with `LocalWidgetHost` does not work today**: it is not exported from npm `ushell-common-components` (DD-04). Either export it first (additive) or develop the widget inside the shell.
+- Relative URLs in `module.json` resolve against the module only for **federated widget URLs**; datastore, datasource and service URLs do not (DD-07). Keep those absolute or host-supplemented for now.
+- Keys are global after loading: the shell merges all module descriptions into one, so `usecaseKey`, workspace keys and `UniqueCommandKey` collide silently across modules (DD-08). Prefix them per module.
 - Module-contributed data providers are not supported: `DatasourceManager` knows only `fuse` and `localstore`. `CustomDataStore`/`CustomDataSource` exist but are not wired to a provider class.
 - No starter template repository exists.
 
