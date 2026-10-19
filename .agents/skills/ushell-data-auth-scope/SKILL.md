@@ -11,8 +11,7 @@ Declarations live in `UShell.PortfolioDescription`. Behavior lives in
 UnifiedJsonMessageWrapper (UJMW), AuthTokenHandling, SmartAmbience.
 
 **Token semantics are owned by the skill `auth-token-handling`** in
-`SmartStandards/AuthTokenHandling` (`.agents/skills/auth-token-handling/SKILL.md`). Load it for any
-work on token sources, login flows, token renewal or 401 handling. This skill only defines how
+`SmartStandards/AuthTokenHandling` (`.agents/skills/auth-token-handling/SKILL.md`). Load it for any work on token sources, login flows, token renewal or 401 handling. This skill only defines how
 the shell *uses* those semantics. Most relevant sections there: §1.3 (lightweight
 implementation in another stack, which is what the shell's `TokenService` is), §6
 (`AuthTokenConfig` as portable strategy description, §6.4 cross-stack rule), §8.4 and §32.2
