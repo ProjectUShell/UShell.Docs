@@ -1,5 +1,7 @@
 *Based on several prototypes from [KornSW](https://github.com/KornSW) since 2015, this document (which was created in 2019 and originated [here](https://kornsw.de/2019/core-ideas-for-a-universal-webshell/)) represents the key concept of the right level of abstraction to describe application use cases on a way that in suitable for rapid development AND professional products. Please don't rename or relocate this document, because it is referenced by external deep-links!*
 
+> **Note (2026-10):** This document is kept as the original concept and is no longer extended. The leading target state of U-Shell is maintained as Agent Skills in [`.agents/skills`](.agents/skills/ushell-architecture/SKILL.md) of this repository.
+
 
 
 # Core ideas for a universal Webshell
