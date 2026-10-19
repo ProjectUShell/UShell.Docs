@@ -10,6 +10,15 @@ Declarations live in `UShell.PortfolioDescription`. Behavior lives in
 (`data/`). Adjacent technologies with their own skills: FUSE-fx RepositoryContract,
 UnifiedJsonMessageWrapper (UJMW), AuthTokenHandling, SmartAmbience.
 
+**Token semantics are owned by the skill `auth-token-handling`** in
+`SmartStandards/AuthTokenHandling` (`.agents/skills/auth-token-handling/SKILL.md`). Load it for any
+work on token sources, login flows, token renewal or 401 handling. This skill only defines how
+the shell *uses* those semantics. Most relevant sections there: §1.3 (lightweight
+implementation in another stack, which is what the shell's `TokenService` is), §6
+(`AuthTokenConfig` as portable strategy description, §6.4 cross-stack rule), §8.4 and §32.2
+(refresh tokens), §12 (fail-closed), §13 (401 vs. 403), §14 (scopes), §20 (UJMW integration),
+§27 (security rules, e.g. never log raw tokens).
+
 Snapshot for status blocks: 2026-10-19, ReactFrontend `c71aa36`, CommonComponents.JS
 `47f1629`, PortfolioDescription `7bf83f4`.
 
@@ -52,6 +61,11 @@ on demand when a datasource or service needs them. Claims/scopes may be mapped t
 
 The shell is the only component that issues, stores, renews and deletes tokens.
 
+Relation to `auth-token-handling`:
+- The shell's token service is a **Level C** consumer (`auth-token-handling` §1.3). It parses the shared `AuthTokenConfig` shape with the same field names, mode names and semantics; it supports a subset of modes, **rejects unsupported modes explicitly** and never silently reinterprets a known mode (§6.4).
+- New issue modes or config fields are proposed to AuthTokenHandling first, because `AuthTokenConfig` is a cross-stack interoperability boundary (§32.4). U-Shell does not extend it locally.
+- Fail-closed (§12): a technical failure while obtaining or renewing a token never results in an unauthenticated call that pretends to be authenticated.
+
 ## 3. Seamless token refresh (target)
 
 The user must never see a backend error just because a token expired.
@@ -59,9 +73,17 @@ The user must never see a backend error just because a token expired.
 1. **Proactive renewal.** The token service knows each token's expiry (`exp` or configuration). Shortly before expiry (configurable skew) it renews in the background using the configured issue mode: refresh token, silent iframe/redirect for OAuth, or re-retrieval for HTTP-GET sources.
 2. **Single flight.** Concurrent requests for the same token source share one renewal.
 3. **Asynchronous token access everywhere.** Every consumer gets the token through an async provider (`getAccessToken(tokenSourceUid)`), never by reading storage synchronously.
-4. **401 rule.** A call answered with HTTP 401 (or the equivalent UJMW fault) triggers exactly **one** renewal of that token source and **one** retry of the original call. A second 401 is not retried.
+4. **401 rule.** A call answered with HTTP 401 (or the equivalent UJMW fault) triggers exactly **one** renewal of that token source and **one** retry of the original call. A second 401 is not retried. **403 is never retried**: it means a known token lacks authorization, and renewal cannot fix that (`auth-token-handling` §13).
 5. **Interactive fallback.** If silent renewal is impossible, the shell opens the login for that token source (overlay). The pending calls wait and resume after a successful login, or fail with a defined "authentication cancelled" result if the user aborts.
 6. **No credential storage.** Never persist passwords or password hashes for auto-login; persist only what the token protocol intends (tokens, refresh tokens) with the configured storage policy.
+
+Boundary to `auth-token-handling` §8.4 / §32.2: the refresh-token model there is
+deliberately not refined yet ("agents MUST NOT invent broader refresh-token propagation
+semantics"). The renewal above is therefore **client-side lifecycle only**: it uses the issue
+modes of the token source's `AuthTokenConfig` as defined today and uses a `refresh_token` only
+where the configured mode already defines that. A client-side refresh model (timing, storage,
+rotation, client vs. server responsibilities) that U-Shell needs is to be contributed to
+AuthTokenHandling §32.2, not defined here (D-11).
 
 Lesson from the legacy generation (CtExpert `w3bstract.ServiceBase`): a central
 `AutoLoginMethod` hook with "retry once, never loop" worked well and is the pattern to keep.

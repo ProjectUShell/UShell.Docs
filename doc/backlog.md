@@ -127,6 +127,7 @@ Handoffs to UniversalBFF (owned and tracked there, listed for visibility):
 | D-08 | Where the `userInput`, confirmation and progress dialogs live (CC primitives used by RF) | UB-07, UB-10, UB-32 |
 | D-09 | Exact set of host-bound values a host may supplement in `module.json`, and the mechanism (server-side overlay vs. separate host document) | UB-82, UniversalBFF |
 | D-10 | Canonical module layout (`module.json`, `ui/`, `api/v{n}/`) mandatory or recommended | UB-84 |
+| D-11 | Client-side refresh-token model (timing, storage, rotation) needed for seamless refresh; to be decided in AuthTokenHandling §32.2, not in U-Shell | UB-20, AuthTokenHandling |
 
 ## Suggested order
 
