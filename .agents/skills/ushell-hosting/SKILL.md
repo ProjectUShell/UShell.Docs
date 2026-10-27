@@ -78,10 +78,12 @@ The shell bundle must run unchanged under every host. Requirements:
 
 ## 4. Module bundle hostability contract
 
-- **M-1 publicPath.** A module bundle is built with webpack `publicPath: "auto"`, so the
-  federation runtime derives the chunk base from the URL of `remoteEntry.js`. No host
-  rewriting is needed. The placeholder `_PUBLIC_PATH_` (replaced by hosts in `.js` and `.html`
-  files) is a supported **legacy path** and must keep working.
+- **M-1 publicPath (open, UB-93 / D-12).** Two variants exist. The placeholder `_PUBLIC_PATH_`
+  (replaced by hosts in `.js` and `.html` files with the mount URL) is proven in productive
+  hosts and must keep working. `publicPath: "auto"` lets the federation runtime derive the
+  chunk base from the URL of `remoteEntry.js` and would need no host rewriting, but it **caused
+  problems in practice**. It must be evaluated in depth before it becomes the standard. Until
+  then, do not switch existing bundles.
 - **M-2 module.json is a React artifact.** The module's React project owns its `module.json`
   (source e.g. `public/module.json` or `src/module.json`), versioned together with the widgets
   it references. The build emits it into the output. It is the single description of the module.
@@ -117,7 +119,8 @@ The shell bundle must run unchanged under every host. Requirements:
 ### Refactoring & compatibility
 - UB-82: **scope reduced.** Relative federated widget URLs already resolve against the module (see status quo). What remains: carry the source URL per loaded module description instead of per use case, declare it on the contract instead of an `any` cast, and extend the resolution to datastore, datasource and service URLs. Additive for widget URLs, since their behavior stays; ⚠ for the other URL kinds, because a module in the field may rely on them resolving against the document today.
 - UB-83: **done for ReactFrontend.** `WidgetHost.tryGetModuleBaseUrl(usecaseKey)` looks the use case up in the merged module and returns its base path. Remaining: `LocalWidgetHost` must offer the same member, and the lookup breaks for duplicate `usecaseKey`s across modules (DD-08).
-- UB-84: module starter template (UB-52) uses `publicPath: "auto"`, ships `module.json` and the canonical layout (section 5).
+- UB-93 / D-12: deep evaluation of `publicPath: "auto"` versus host replacement (reproduce the observed problems, root causes, affected hosts including WebView custom schemes).
+- UB-84: module starter template (UB-52) uses the `publicPath` strategy decided in D-12, ships `module.json` and the canonical layout (section 5).
 - Hosts keep replacing `_PUBLIC_PATH_` for existing bundles.
 
 ## 5. Canonical module layout
@@ -173,7 +176,8 @@ Shell and modules as plain files (CDN, nginx, IIS static site). The shell folder
 `portfolio/` folder (or the page sets the `portfolioLocation` meta); each module is a copied
 `dist` in the canonical layout. The host must configure SPA fallback for the shell mount
 (H-4), cache headers (H-6) and CORS for cross-origin module bundles. No placeholder
-replacement happens, so module bundles must use `publicPath: "auto"` (M-1).
+replacement happens, so static hosting needs either `publicPath: "auto"` or a deployment-time
+replacement of `_PUBLIC_PATH_`; which one is decision D-12 (M-1).
 
 ### 6.3 UShell.FrontendBundle.Mvc without UniversalBFF
 
@@ -194,7 +198,7 @@ changes beyond H-5 (origin independence). Controlling the shell from the host is
 
 ## 7. Checklist for a hostable module
 
-- [ ] Bundle built with `publicPath: "auto"` and a unique federation name.
+- [ ] Bundle built with the `publicPath` variant the host supports (D-12 open) and a unique federation name.
 - [ ] `module.json` lives in the React project and is emitted by the build.
 - [ ] All URLs in `module.json` are relative to the module base or genuinely external.
 - [ ] Build output follows the canonical layout (`module.json`, `ui/`).

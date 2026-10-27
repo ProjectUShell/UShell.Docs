@@ -65,6 +65,22 @@ Relation to `auth-token-handling`:
 - New issue modes or config fields are proposed to AuthTokenHandling first, because `AuthTokenConfig` is a cross-stack interoperability boundary (§32.4). U-Shell does not extend it locally.
 - Fail-closed (§12): a technical failure while obtaining or renewing a token never results in an unauthenticated call that pretends to be authenticated.
 
+### Target: central frontend AuthTokenManager (UB-26)
+
+One central place in the frontend supplies **URLs and tokens** to every transport (UJMW dynamic
+client `createServiceProxy`, FUSE datastores, server commands). It is the TypeScript equivalent
+of `AccessTokenManager` in AuthTokenHandling and:
+
+- resolves service URLs and token sources from the declarations (together with UB-21),
+- manages the claims of validated tokens,
+- derives more abstract RuntimeTags from claims and ApplicationScope for showing/hiding UI elements (UB-04); the server still validates every call,
+- contributes scope values from claims to the UJMW side channel (UB-22).
+
+Widgets never decode tokens; they consume RuntimeTags and ApplicationScope.
+
+**Naming:** `tokenSourceUid` becomes `tokenSourceId` in the medium term, aligned with
+AuthTokenHandling (UB-27). Both names must be accepted during the transition.
+
 ## 3. Seamless token refresh (target)
 
 The user must never see a backend error just because a token expired.

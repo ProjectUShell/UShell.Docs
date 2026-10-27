@@ -1,6 +1,6 @@
 ---
 name: ushell-module-development
-description: How to build a new U-Shell module from scratch (target practice plus current status) - designing the use-case graph first, writing a purely declarative module.json, and only when needed a module bundle (own React frontend app loaded via module federation) that contributes widgets and/or data providers, running widgets stand-alone with LocalWidgetHost, hosting, and the rules a module must follow. Load when creating a new module, a new remote widget or a new provider for U-Shell. Requires ushell-architecture, ushell-declarative-model and ushell-widget-contract.
+description: How to build a new U-Shell module from scratch (target practice plus current status) - designing the use-case graph first, writing a purely declarative module.json, turning a blank React SPA into a U-Shell module bundle step by step, and only when needed a module bundle
 ---
 
 # Building U-Shell modules from scratch
@@ -31,9 +31,446 @@ Most modules need no bundle.
 - React + TypeScript, webpack **module federation**. Expose each widget as a federated module. Share `react`, `react-dom`, `ushell-modulebase` and `ushell-common-components` as singletons with the shell.
 - Reference a widget in the use case: `WidgetClass` = JSON `{ "scope": "<federation name>", "module": "./<exposed>", "url": "<base>/remoteEntry.js" }` (see `UsecaseDescription.SetRemoteWidget`).
 - **Widget rules** (`ushell-widget-contract`): keep all meaningful state in `state.unitOfWork` and publish via `populateChangedState`; use only the WidgetHost for data, services, tokens, scope and commands; no own routing, no own login, no `localStorage` for app state, no hard-coded backend URLs.
+- **Preferred stack**: **TypeScript** (not plain JavaScript), **Tailwind CSS**, webpack 5 **`ModuleFederationPlugin`**.
 - **Styling**: Tailwind with the shell's design tokens so dark/light mode and CI apply.
-- **Stand-alone development**: render the widget with `LocalWidgetHost` and local data sources from CommonComponents, optionally inside the shared shell-layout primitives, so the widget can be debugged without a running shell.
+- **Stand-alone**: only for local debugging (section 3.7).
 - **Data providers** (target): a bundle registers additional `ProviderClass` names for datastores/datasources. The module description then uses them like built-in ones.
+
+### 3.1 From a blank React SPA to a U-Shell module
+
+Starting point: a plain React SPA with its own `index.tsx` / `App.tsx`. Target: a module bundle whose widgets the shell loads via module federation.
+
+1. **Use TypeScript.** Convert `.js`/`.jsx` to `.ts`/`.tsx` and enable `strict`. Widget contract and service contracts are TypeScript interfaces.
+2. **Build with webpack 5.** Replace other toolchains (CRA, Vite, ...) instead of running them in parallel; keep exactly one build path. Loaders: `ts-loader` (or Babel with TypeScript preset) for `.ts`/`.tsx`, `style-loader` + `css-loader` + `postcss-loader` for Tailwind.
+3. **Add the U-Shell packages.** `ushell-modulebase` (contract: `IWidget`, `IWidgetHost`, `UsecaseState`) and, when generic UI or local data sources are needed, `ushell-common-components`.
+4. **Make the bootstrap asynchronous.** `index.tsx` only contains `import("./bootstrap")` (or `import("./App")`). This gives the federation runtime time to negotiate shared modules before React loads; otherwise webpack fails with "Shared module is not available for eager consumption".
+5. **Write one module entry component per widget** (section 3.2):
+
+   ```tsx
+   import React from "react";
+   import { IWidget } from "ushell-modulebase";
+
+   const FeatureModule: React.FC<{ inputData: IWidget }> = ({ inputData }) => {
+     // resolve host-related things here, then render the host-agnostic page
+     return <FeaturePage /* typed props and service interfaces */ />;
+   };
+
+   export default FeatureModule;
+   ```
+
+6. **Register every entry component in `exposes`** of the `ModuleFederationPlugin`. An entry component that is not exposed does not exist for the shell:
+
+   ```js
+   const ModuleFederationPlugin = require("webpack/lib/container/ModuleFederationPlugin");
+   const { dependencies } = require("./package.json");
+
+   new ModuleFederationPlugin({
+     name: "<federation_name>",          // unique per module; the "scope" in the widget reference
+     filename: "remoteEntry.js",
+     exposes: {
+       "./FeatureAModule": "./src/components/_Pages/FeatureAModule.tsx",
+       "./FeatureBModule": "./src/components/_Pages/FeatureBModule.tsx",
+     },
+     shared: {
+       ...dependencies,
+       react: { singleton: true, requiredVersion: dependencies["react"] },
+       "react-dom": { singleton: true, requiredVersion: dependencies["react-dom"] },
+     },
+   });
+   ```
+
+   `react` and `react-dom` as singletons are mandatory. See section 3.6 for the other shared libraries and for `output.publicPath`.
+7. **Set up Tailwind.** `darkMode: "class"`, `content: ["./src/**/*.{ts,tsx}"]`, colors through the shell's semantic tokens (CSS variables) instead of fixed values.
+8. **Reference the widgets in the module description.** `SetRemoteWidget("<federation_name>", "./FeatureAModule", "ui/remoteEntry.js")` in .NET or the JSON `WidgetClass` (section 3), with the `remoteEntry.js` URL relative to `module.json`.
+9. **Reduce `App.tsx` to a local debug harness** (section 3.7). The shell never loads it.
+10. **Run the checklist** (section 5).
+
+### 3.2 Bundle structure: module entry component and page
+
+The signature `const <Name>Module: React.FC<{ inputData: IWidget }>` carries semantics: it is the
+**mandatory entry point and the interface to U-Shell**. The shell loads the exposed module and
+passes exactly one prop, `inputData` (`state` + `widgetHost`). Therefore:
+
+- the component is the default export of a file listed in `exposes`,
+- the prop name `inputData` is fixed,
+- the exposed key (`./<Name>Module`) is a public contract referenced by module descriptions; renaming it is a breaking change.
+
+Split every exposed widget into two layers:
+
+| Layer | Typical file | Knows `widgetHost` | Responsibility |
+|---|---|---|---|
+| **Module entry component** | `<Name>Module.tsx`, exposed as `./<Name>Module` | yes |
+| **Page** and below | `<Name>.tsx`, organisms, atoms | no | Pure UI and use-case logic against injected service interfaces and props. |
+
+Rules:
+- Keep entry components thin. They contain no layout and no business logic.
+- Pages and everything below them never import runtime APIs of `ushell-modulebase` and never receive `widgetHost`. This keeps them testable, runnable stand-alone and reusable in another host.
+- Create service proxies once per widget instance: `useMemo(() => inputData.widgetHost.createServiceProxy<IService>(...), [inputData.widgetHost])`. Depending on the whole `inputData` recreates proxies on every UoW change.
+
+### 3.3 Service contracts
+
+- One TypeScript interface per backend service. Methods mirror the UJMW operations and return `Promise<{ return: T }>` (the UJMW response wrapper; out/ref parameters appear as further properties).
+- Model request and response DTOs explicitly. Avoid `any`, because it removes the compile-time check against backend contract changes.
+- Keep contracts in a dedicated folder (business-logic layer), separate from components.
+- Every promise has an error path. Show an in-flight state and reset it in `finally`. Surface errors to the user instead of only writing them to the console.
+
+### 3.4 Service access and tokens
+
+- `createServiceProxy<IService>(serviceUrl, tokenSource)` is the **TypeScript counterpart of the UJMW dynamic client** known from .NET. It turns a service interface into a typed proxy whose calls are UJMW requests; the shell wires in the token and the ApplicationScope side channel.
+- **Target: one central place that supplies URLs and tokens.** Widgets only name the service they need (`getServiceByName`, UB-21). A central frontend AuthTokenManager (UB-26) resolves the token source, the token and the side-channel values. Widgets hold neither URLs nor token source identifiers.
+- **Today (design debt, UB-21/UB-26):** widgets pass the service URL and the token source themselves. Mitigation until the central place exists:
+  - one constant per bundle for the token source, never repeated per entry component,
+  - calls isolated in entry components, so the later switch touches only them,
+  - a relative `serviceUrl` is resolved by the shell implementation in use; verify the resolution base, do not rely on it implicitly.
+- **Naming:** the contract parameter is still called `tokenSourceUid`. In the medium term it becomes **`tokenSourceId`**, aligned with AuthTokenHandling (UB-27). Use "token source id" for new identifiers and documentation.
+
+#### Claims, RuntimeTags and side channel (target concept)
+
+Claims are not a widget concern. The central frontend AuthTokenManager (UB-26, the TypeScript
+equivalent of `AccessTokenManager` in AuthTokenHandling):
+
+- manages the claims of the validated tokens,
+- derives more abstract **RuntimeTags** from claims and ApplicationScope, used to show/hide or enable/disable UI elements (commands, use cases, widget parts); the server validates every call again, RuntimeTags are UI convenience, not security,
+- sends scope values derived from claims as part of the **UJMW side channel** with every request.
+
+Widgets react to RuntimeTags and ApplicationScope; they never decode tokens. As long as UB-26
+does not exist, a widget that really needs a claim reads it in its entry component inside an
+effect (never during render), passes only the derived value down and never stores the token.
+Mark such code as design debt with a reference to UB-26.
+
+### 3.5 Shell capabilities outside the interface
+
+Some shell members exist only on the WidgetHost class (`switchScope`, `getApplicationScopeValues`, breadcrumb helpers, see `ushell-widget-contract`). Do not call them through `as any`. Declare a local optional interface and check for the member before calling it:
+
+```ts
+interface IScopeSwitchingHost {
+  switchScope?: (scopeKey: string, targetValue: any) => void;
+}
+
+const host: IScopeSwitchingHost = inputData.widgetHost as IScopeSwitchingHost;
+if (host.switchScope) {
+  host.switchScope("<dimension>", value);
+}
+```
+
+Prefer a command (`fireEvent`) whenever the module description can express the same intent. Remove the local interface once the member is part of `IWidgetHost` (UB-16).
+
+### 3.6 Federation configuration
+
+- **`output.publicPath` is an open point (UB-93, D-12).**
+  - `"_PUBLIC_PATH_"`: a placeholder the host replaces with the mount URL when delivering `.js`/`.html` files. Proven in productive hosts.
+  - `"auto"`: the federation runtime derives the chunk base from the `remoteEntry.js` URL. Theoretically host-independent, but **caused problems in practice**.
+
+  Until D-12 is decided, do not switch existing bundles. For new bundles use the variant the target host supports and record that choice in the module's documentation.
+- Mark at least `react` and `react-dom` explicitly as `singleton` with `requiredVersion`. `ushell-modulebase` and `ushell-common-components` should be singletons as well (see `ushell-hosting` M-5). Sharing all `dependencies` without singleton flags can load a second copy of libraries that hold global state.
+- In the module description, reference `remoteEntry.js` **relative** to `module.json` (e.g. `ui/remoteEntry.js`). Switch to an absolute dev-server URL only locally, through configuration, not by editing code.
+- The dev server must send CORS headers for the shell origin when the shell loads the bundle from it.
+- Keep exactly one build path for the bundle. Do not maintain a second toolchain (e.g. a CRA script) next to the federation build.
+
+### 3.7 Stand-alone: local debugging only
+
+Stand-alone operation exists **only for local debugging** of a widget during development. It is
+not a product feature, not a delivery variant and not a substitute for testing inside the shell.
+
+- Closest to reality: render the **module entry component** with `LocalWidgetHost`, local data sources and stubs for tokens and scope.
+- Quick alternative: render the **page** directly with service proxies against a locally running backend or with fakes. This works because of the entry/page split.
+- Never commit tokens, credentials or environment-specific bindings, not even commented out. Load them from local, git-ignored configuration.
+
+### 3.8 Anti-patterns found in practice
+
+| Anti-pattern | Instead |
+|---|---|
+| Async host calls (`getAccessToken`, service calls) during render | `useEffect` with cleanup or a query library |
+| Token source repeated in every entry component | One bundle constant; target central resolution (UB-21, UB-26) |
+| Decoding or evaluating claims in the widget | RuntimeTags and ApplicationScope from the central AuthTokenManager (UB-26) |
+| `(widgetHost as any).member(...)` | Local optional interface plus feature check, or a command |
+| `localStorage` for widget data | UoW for use-case state; shell preferences for user preferences |
+| `any`-typed DTOs | Explicit DTO types |
+| Errors only in `console.error` | Visible error state plus central logging |
+| Switching `publicPath` without evaluation | Keep the host-supported variant until D-12 |
+| Stand-alone app treated as a deliverable | Stand-alone only for local debugging |
+
+### 3.9 Using CommonComponents `Table` and GUIFAD in a widget
+
+The generic table and the GUIFAD family (generic entity browser/editor) cover most list, CRUD
+and master-detail needs. This section shows how to use them, from "no code at all" to "own
+widget with a plain table". Examples are source-verified against CommonComponents.JS
+`origin/master` 2026-10-19 (`7a9ee95`); consumers on older 1.2.x/1.3.x versions see a smaller
+prop set (e.g. `selectedRecord` instead of `selectedRecords`, no `getId`, `useClientFilter`,
+`pageSizes`). All entity, field and module names below are placeholders.
+
+#### Which component for which need
+
+| Need | Use | Own bundle code |
+|---|---|---|
+| Browse/edit an entity graph from a FUSE datastore | built-in widget `guifad` in `module.json` (case A) | none |
+| Same, but with own toolbar, layout or entry logic | `Guifad` in a module entry component (case B) | thin entry |
+| One entity list with search, query editor, CRUD side panel, navigation | `EntityTable` over a host-resolved `IDataSource` (case C) | thin entry \+ layout |
+| Records that are not plain repository rows (merged, filtered, enriched) | own `IDataSource` wrapping the host datasource, shown in `EntityTable` (case D) | datasource class |
+| Data from a service operation, not from a repository; full control of columns | plain `Table` (case E) | page component |
+| Same component outside the shell (plain React app) | case F - not a module pattern | - |
+
+Prefer the first row that fits. Every step down adds code the module owns.
+
+#### Case A - no bundle: declare the built-in widget
+
+The shell renders built-in CommonComponents widgets by name. GUIFAD reads its input from the
+UnitOfWork (contract table in `ushell-design-debt` DD-02):
+
+```json
+{
+  "usecaseKey": "<module>.EntityBrowser",
+  "title": "<Entities>",
+  "widgetClass": "guifad",
+  "unitOfWorkDefaults": {
+    "entityName": "<RootEntity>",
+    "layoutDescription": { "entityLayouts": [] }
+  }
+}
+```
+
+The entity must be served by a datastore declared in the same module (`fuse` provider, token
+source by id). Do not use `guifadFuse` for new modules: it takes the backend URL from the
+UnitOfWork (DD-03, UB-88).
+
+#### Case B - `Guifad` inside an own module entry
+
+The `IWidgetHost` is also the data source manager (`tryGetDataSource`, `getSchemaRoot`), so the
+entry passes it straight through. Persist the GUIFAD navigation state into the UnitOfWork so
+reload restores it:
+
+```tsx
+import React from "react";
+import { IWidget } from "ushell-modulebase";
+import { Guifad } from "ushell-common-components";
+
+const EntityBrowserModule: React.FC<{ inputData: IWidget }> = ({ inputData }) => {
+  return (
+    <Guifad
+      dataSourceManager={inputData.widgetHost}
+      rootEntityName="<RootEntity>"
+      layoutDescription={inputData.state.unitOfWork.layoutDescription}
+      uow={inputData.state.unitOfWork}
+      persistUow={(uow) => {
+        inputData.state.unitOfWork = uow;
+        inputData.widgetHost.populateChangedState(inputData.state);
+      }}
+    />
+  );
+};
+
+export default EntityBrowserModule;
+```
+
+This mirrors the internal `GuifadModule` wrapper, which itself cannot be imported (DD-04) and
+uses the prop name `widget` instead of `inputData` (DD-01).
+
+#### Case C - `EntityTable` over a host-resolved datasource
+
+`EntityTable` brings search, query editor, paging, sorting, column filters and a CRUD side
+panel. The entry resolves the datasource by entity name; the page only receives typed inputs:
+
+```tsx
+const EntityListModule: React.FC<{ inputData: IWidget }> = ({ inputData }) => {
+  const dataSource: IDataSource | null = inputData.widgetHost.tryGetDataSource("<Entity>");
+  if (!dataSource) {
+    return <ErrorState message="Datasource '<Entity>' is not declared in the module." />;
+  }
+  return <EntityListPage dataSource={dataSource} dataSourceManager={inputData.widgetHost} />;
+};
+
+const EntityListPage: React.FC<{
+  dataSource: IDataSource;
+  dataSourceManager: IDataSourceManagerWidget;
+}> = ({ dataSource, dataSourceManager }) => {
+  const [reloadToken, setReloadToken] = useState<number>(0);
+  return (
+    <EntityTable
+      dataSource={dataSource}
+      entitySchema={dataSource.entitySchema!}
+      dataSourceManagerForNavigations={dataSourceManager}
+      layoutDescription={{ entityLayouts: [createEntityLayout()] }}
+      reloadTriggerObject={reloadToken}
+      enableParentFilter={false}
+      pageSizes={[50, 100, 200]}
+      customColumns={[
+        {
+          key: "StateDisplay",
+          fieldName: "StateDisplay",
+          fieldType: "string",
+          label: "State",
+          onRenderCell: (cellValue, record) => <StateBadge state={record.State} />,
+        },
+      ]}
+    />
+  );
+};
+```
+
+- `layoutDescription` controls which fields appear in the table (`tableFields`), labels
+  (`fieldLayouts`), form partitions and static dropdown entries. Build it once (constant or
+  `useMemo`), not on every render.
+- `customColumns` adds computed columns; `onRenderCell` receives the cell value **and** the
+  whole record.
+- `reloadTriggerObject`: any changing value forces a reload (e.g. after an external refresh
+  button). `onRecordsChanged` reports CRUD changes back.
+- Flags: `enableCrud`, `enableQueryEditor`, `enableSearch`, `enableParentFilter`.
+
+#### Case D - own datasource wrapping the host datasource
+
+When the rows come from somewhere else (a service operation, a merge, a pre-filter by a
+selected tree node) but the UI should stay `EntityTable`, implement `IDataSource` and delegate
+what you do not change to the host datasource. Reuse the exported helpers for client-side
+processing:
+
+```ts
+import { IDataSource } from "ushell-modulebase";
+import { applyFilter, applySorting, applyPaging } from "ushell-common-components";
+
+export class ScopedEntityDataSource implements IDataSource {
+  // delegate identity, schema, factory, delete, entity refs to the inner datasource
+  constructor(private readonly inner: IDataSource, private readonly loadRows: () => Promise<any[]>) { /* ... */ }
+
+  getRecords(filter?: LogicalExpression, paging?: PagingParams, sorting?: SortingField[]): Promise<PaginatedList> {
+    return this.loadRows().then((rows) => {
+      let result: any[] = rows;
+      if (filter) { result = applyFilter(result, filter, this.inner.entitySchema!); }
+      if (sorting) {
+        result = applySorting(result, sorting, sorting.map((s) => ({
+          fieldType: this.inner.entitySchema!.fields.find((f) => f.name == s.fieldName)!.type,
+        })));
+      }
+      const total: number = result.length;
+      if (paging) { result = applyPaging(result, paging); }
+      return { page: result, total: total };
+    });
+  }
+}
+```
+
+- Create the wrapper with `useMemo` keyed by its inputs (e.g. the selected scope), not on
+  every render; a fresh instance per render resets table state.
+- `loadRows` goes through a typed service contract created in the entry (section 3.4), never
+  through a static `Service.baseUrl` set from the UnitOfWork.
+- Every method of `IDataSource` must either delegate or be deliberately unsupported with a
+  clear error; do not leave `throw new Error("Method not implemented.")` on methods the table
+  calls (`getRecord`, `getEntityRefs` for lookups).
+- Client-side filtering is acceptable only for small result sets. For large sets, pass
+  filter/paging/sorting to the backend.
+
+#### Case E - plain `Table` with own data loading
+
+Use `Table` when the data is not entity-shaped or when the module needs full control of
+columns, selection and row actions. `Table` renders records and reports interaction; it never
+loads data itself.
+
+```tsx
+import { Table, MultiSelectFilter } from "ushell-common-components";
+
+const columns: TableColumn[] = [
+  { key: "name", fieldName: "name", fieldType: "string", label: "Name", sortable: true, maxCellLength: 300 },
+  {
+    key: "level", fieldName: "level", fieldType: "int32", label: "Level", sortable: true,
+    onRenderCell: (value) => <LevelBadge level={value} />,
+    renderFilter: (filter, onFilterChanged, column) => (
+      <MultiSelectFilter
+        column={column}
+        initialValues={getSelectedValues(filter, column.fieldName)}
+        onFilterChanged={onFilterChanged}
+        options={levelOptions}
+      />
+    ),
+  },
+  { key: "receivedUtc", fieldName: "receivedUtc", fieldType: "datetime", label: "Received", sortable: true },
+];
+
+const ItemListPage: React.FC<{ itemService: IItemService; onOpen: (item: ItemDto) => void }> = ({ itemService, onOpen }) => {
+  const [paging, setPaging] = useState<PagingParams>({ pageNumber: 1, pageSize: 100 });
+  const [sorting, setSorting] = useState<SortingField[]>([{ fieldName: "receivedUtc", descending: true }]);
+  const [filters, setFilters] = useState<{ [column: string]: LogicalExpression }>({});
+  const [page, setPage] = useState<{ items: ItemDto[]; total: number }>({ items: [], total: 0 });
+  const [selected, setSelected] = useState<ItemDto[]>([]);
+
+  useEffect(() => {
+    let active: boolean = true;
+    itemService.getItems({ paging: paging, sorting: sorting, filters: filters }).then((response) => {
+      if (active && response.return) { setPage(response.return); }
+    });
+    return () => { active = false; };
+  }, [itemService, paging, sorting, filters]);
+
+  return (
+    <Table
+      columns={columns}
+      records={page.items}
+      getId={(item: ItemDto) => item.id}
+      totalCount={page.total}
+      pagingParams={paging}
+      onPagingParamsChange={(p) => setPaging(p)}
+      pageSizes={[100, 500, 1000]}
+      initialSortingParams={sorting}
+      onSortingParamsChange={(s) => setSorting(s)}
+      initialFilters={filters}
+      onFilterChanged={(f) => setFilters({ ...f })}
+      selectedRecords={selected}
+      onSelectedRecordsChange={(records) => setSelected(records)}
+      onRecordEnter={(item) => onOpen(item)}
+      expandableRowProps={{
+        rowExpandable: (item) => item.hasDetails,
+        renderExpandedRow: (item) => <ItemDetails item={item} />,
+      }}
+      rowHeight={0}
+    />
+  );
+};
+```
+
+| Prop group | Props | Notes |
+|---|---|---|
+| Data | `columns`, `records`, `getId` | `getId` makes selection stable across reloads |
+| Paging | `pagingParams`, `totalCount`, `onPagingParamsChange`, `pageSizes` | omit all four for an unpaged table |
+| Sorting | `initialSortingParams`, `onSortingParamsChange` | per column `sortable`; without `onSortingParamsChange` the table sorts the given records itself |
+| Filtering | `initialFilters`, `onFilterChanged`, column `renderFilter` | filters are `LogicalExpression` per column key; a server-side mapping is the module's job |
+| Client-side mode | `useClientFilter` | filter the given records in the browser; only for small, fully loaded sets |
+| Selection | `selectedRecords`, `onSelectedRecordsChange`, `onRecordEnter` | `onRecordEnter` is the "open" gesture |
+| Presentation | `onRenderCell`, `maxCellLength`, `minCellLength`, `expandableRowProps`, `rowHeight`, `tableColors`, `className` | |
+| Tree | `isParent`, `showTree` | hierarchical rows |
+
+Rules for case E:
+
+- "Open" on `onRecordEnter` should normally fire a command (`widgetHost.fireEvent`) that opens
+  a dynamic use case with the record identity in its UoW. Open details inline only when they
+  are not a use case of their own.
+- Keep paging, sorting, filters and selection that should survive reload in the UnitOfWork,
+  not in `localStorage` (section 3.8). User preferences such as visible columns belong to shell
+  preferences once available.
+- A mapping between the table's `LogicalExpression` filters and the backend's own filter format
+  belongs in one typed function, not spread over event handlers.
+- Use `MultiSelectFilter` and the other filter molecules before writing own filter UI.
+  `getSelectedValues` (used by the CommonComponents demo to prefill it) is not exported yet
+  (UB-85); a module keeps a small local equivalent until it is.
+
+#### Case F - outside the shell (not a module pattern)
+
+The components also work in a plain React app. Such an app creates the datastore itself, for
+example `new FuseDataStore(baseUrl, "route", ...)` with `dataStore.init()` and
+`dataStore.tryGetDataSource("<Entity>")`, and feeds `EntityTable` or `Table` directly. This is
+fine for a separate application and for local debugging (section 3.7). Inside a module it
+bypasses the declared datastores, token sources and side channel: never construct
+`FuseDataStore` or call `GuifadFuse` with a URL from widget code.
+
+#### Pitfalls seen in existing consumers
+
+| Seen | Instead |
+|---|---|
+| Backend URL in the UnitOfWork, assigned to a static `Service.baseUrl` in the wrapper | Declared datastore/service; typed proxy created in the entry (section 3.4) |
+| `(widgetHost as any).tryGetModuleBaseUrl(...)` to build service URLs | Typed optional interface plus feature check; target UB-21/UB-26 |
+| `inputData: any` in the entry | `inputData: IWidget` |
+| Request the export (UB-85). Until then use `import type` for types only (erased at build) and never deep-import runtime components, especially not from `dist/cjs` (second React instance, M-5) |
+| Table filters, paging and column choice persisted in `localStorage` | UoW for use-case state; shell preferences for user preferences |
+| `layoutDescription` and wrapper datasource recreated on every render | `useMemo` or module-level constants |
+| `console.log` of `inputData` and datasources | Remove; use central logging for real diagnostics |
+| A second wrapper per widget that also creates its own `QueryClient` | One provider per bundle entry, created once |
 
 ### Status quo
 - Remote widgets are loaded by `FederatedComponentProxy` and receive **one prop `inputData`**, which carries the `IWidget` (`state` + `widgetHost`). Write remote widgets against that prop name. The built-in wrappers inside CommonComponents use a different prop (`widget`), so they are not a template for a remote widget - see DD-01.
@@ -43,11 +480,19 @@ Most modules need no bundle.
 - Keys are global after loading: the shell merges all module descriptions into one, so `usecaseKey`, workspace keys and `UniqueCommandKey` collide silently across modules (DD-08). Prefix them per module.
 - Module-contributed data providers are not supported: `DatasourceManager` knows only `fuse` and `localstore`. `CustomDataStore`/`CustomDataSource` exist but are not wired to a provider class.
 - No starter template repository exists.
+- `getServiceByName` is not usable in the shell, so productive bundles use `createServiceProxy` with a service URL and a token source (design debt, section 3.4).
+- There is no central frontend place that supplies URLs and tokens; widgets that need identity or tenant information read token claims themselves (design debt, UB-26).
+- Widgets that need to switch the ApplicationScope can only reach `switchScope` through the class (section 3.5).
+- The `publicPath` strategy for module bundles is not decided (UB-93, D-12).
 
 ### Refactoring & compatibility
 - UB-51: provider registration for module bundles.
 - UB-52: starter template (module.json + optional bundle + stand-alone harness).
 - UB-17: widget registry, so bundles can also contribute named widgets.
+- UB-21: resolve services by name from the module description.
+- UB-26: central frontend AuthTokenManager (URLs, tokens, claims -> RuntimeTags, side channel).
+- UB-27: rename `tokenSourceUid` to `tokenSourceId`; accept both during the transition.
+- UB-93 / D-12: evaluate `publicPath` in depth before changing the starter template (UB-84).
 - Keep the `inputData` prop for federated widgets. A clearer prop name can only be added alongside it.
 
 ## 4. Hosting
@@ -55,7 +500,7 @@ Most modules need no bundle.
 The hostability contract and the delivery variants are owned by `ushell-hosting`. In short:
 
 - `module.json` is a plain HTTP GET resource. In the target state it is an artifact of the module's React project (when a bundle exists), served under the module base URL; the main delivery path is UniversalBFF (assembly with embedded build output).
-- A module bundle is static content (`remoteEntry.js` + chunks), built with `publicPath: "auto"`; CORS must allow the shell origin.
+- A module bundle is static content (`remoteEntry.js` + chunks); its `publicPath` strategy is still open (section 3.6); CORS must allow the shell origin.
 - URLs inside `module.json` are relative to the `module.json` URL (canonical layout `module.json`, `ui/`, `api/v{n}/`).
 - Backends that serve the module's datastores and services use UJMW (FUSE repository endpoints, service controllers, server command executor). They restore ApplicationScope from the UJMW side channel via SmartAmbience.
 
@@ -66,3 +511,11 @@ The hostability contract and the delivery variants are owned by `ushell-hosting`
 - [ ] No token, URL or scope handling inside widgets.
 - [ ] Toolbars and confirmations are commands, not buttons inside widgets (except widget-internal controls).
 - [ ] Everything generic that was built got proposed to CommonComponents or the shell backlog.
+- [ ] TypeScript, Tailwind and `ModuleFederationPlugin`; every module entry component (`React.FC<{ inputData: IWidget }>`) is listed in `exposes`.
+- [ ] Every exposed widget is a thin entry component; pages do not know `widgetHost`.
+- [ ] Service contracts and DTOs are typed without `any`; every call has a visible error path.
+- [ ] No async host calls during render; no token claims evaluated in widgets (or marked as design debt referencing UB-26).
+- [ ] No `as any` access to the WidgetHost; class-only members go through a local optional interface.
+- [ ] `publicPath` follows the host-supported variant (D-12 open), `react`/`react-dom` shared as singletons, `remoteEntry.js` referenced relative to `module.json`.
+- [ ] Stand-alone harness used only for local debugging, without committed tokens or credentials.
+- [ ] Lists and entity editors use CommonComponents (`guifad`, `Guifad`, `EntityTable`, `Table`) per section 3.9 before any own table/form; no `GuifadFuse`/`FuseDataStore` with URLs in widget code.

@@ -64,6 +64,10 @@ instance into a federated bundle (M-5 in `ushell-hosting`).
 Completing the export surface is additive and therefore always safe. See UB-85 and the
 repository skill `ushell-common-components-development` for the mechanics.
 
+How a module uses `guifad`, `Guifad`, `EntityTable` and `Table` from a widget (cases A to F,
+including pitfalls seen in existing consumers) is described in `ushell-module-development`
+section 3.9.
+
 ## 3. Data connectors and transport duties
 
 Connectors in `src/data/`: `FuseDataStore`, `FuseConnector`, `FuseDataSource*`,

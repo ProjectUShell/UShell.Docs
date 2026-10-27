@@ -54,6 +54,10 @@ ownership, priority and compatibility risk.
 | UB-21 | Resolve datasources by UID and services by name | RF | P2 | additive | data-auth-scope §1 |
 | UB-22 | One side-channel builder for all transports, per call, transmitting values; body `_` or header; dimension filter | RF, CC | P1 | opt-in ⚠ (label -> value) | data-auth-scope §4 |
 | UB-23 | ApplicationScope runtime: separate definition and current value; fix unknown keys being dropped in `SetAppScope`; migrate persisted format | RF | P1 | additive (migrate) | declarative-model §8 |
+| UB-24 | Cookie-based token mode (BFF cookie pattern): new token-source mode in which the BFF keeps the token server-side and the browser only holds an HttpOnly, Secure, SameSite session cookie; transports send credentials instead of an `Authorization` header; logon/logout/expiry state via a BFF session endpoint; CSRF protection for state-changing calls. Raw-token mode in `localStorage` stays as legacy mode during the transition. Larger refactoring of TokenService, transports and DatasourceManager; requested by UniversalBFF (decision D-19 in its UserManagement OAuth skill) | PD, RF, CC | P1 | opt-in | data-auth-scope §3 |
+| UB-25 | Datastore token-source alias "primary UI token": a datastore `tokenSourceUid` may reference the source that was actually used for the UI logon, so one datastore works with several logon sources (UniversalBFF decision D-17) | PD, RF | P1 | additive | data-auth-scope §1 |
+| UB-26 | Central frontend AuthTokenManager (TypeScript equivalent of AuthTokenHandling's `AccessTokenManager`): one place that supplies URLs and tokens to all transports (UJMW dynamic client `createServiceProxy`, FUSE, server commands); manages claims; derives RuntimeTags from claims + ApplicationScope for UI visibility (server validates again); adds scope values from claims to the UJMW side channel. Removes the need for widgets to pass URLs/token sources or to read claims | RF, MB, CC | P1 | additive | data-auth-scope §2, module-development §3.4 |
+| UB-27 | Rename `tokenSourceUid` to `tokenSourceId` (AuthTokenHandling terminology) in declarations, WidgetHost and transports; accept both names during the transition | PD, MB, RF, CC | P2 | ⚠ (alias required) | data-auth-scope §2 |
 
 ## Epic C - Server commands
 
@@ -81,6 +85,7 @@ ownership, priority and compatibility risk.
 | UB-50 | Verify/complete CRUD overview pattern and entity-ref label resolver in the generic entity browser | CC | P2 | additive | common-components §2 |
 | UB-51 | Provider-class registration for module bundles (datastores/datasources) | RF, MB | P2 | additive | module-development §3 |
 | UB-52 | Starter template: module.json + optional bundle + stand-alone harness with `LocalWidgetHost` | new repo or DOC | P2 | - | module-development §3 |
+| UB-53 | Review productive module bundles against the module-development anti-pattern list (token source repeated per widget, claims read in widgets, `as any` host access, `any` DTOs, committed dev credentials) and plan their migration after UB-21/UB-26 | modules | P3 | - | module-development §3.8 |
 
 ## Epic F - Legacy and CtExpert
 
@@ -106,7 +111,8 @@ ownership, priority and compatibility risk.
 | UB-81 | Cache-header defaults for embedded shell and module bundles (`no-cache` for html/json/`remoteEntry.js`) | FB | P3 | additive | hosting §3 |
 | UB-82 | Carry the source URL per module description (contract property instead of `any` cast) and extend resolution to datastore/datasource/service URLs. Relative **widget** URLs already resolve, see DD-06, DD-07 | PD, RF | P1 | ⚠ | hosting §4 |
 | UB-83 | `tryGetModuleBaseUrl`: done in ReactFrontend, still missing in `LocalWidgetHost`; disambiguate the lookup once modules stay addressable (UB-86) | MB, CC | P2 | additive | hosting §4, widget-contract §2 |
-| UB-84 | Starter template with `publicPath: "auto"`, `module.json` in the React project and canonical layout (extends UB-52) | DOC | P2 | - | hosting §4, §5 |
+| UB-84 | Starter template with the `publicPath` strategy decided in D-12, `module.json` in the React project and canonical layout (extends UB-52) | DOC | P2 | - | hosting §4, §5 |
+| UB-93 | Deep evaluation of `publicPath: "auto"` vs. host-replaced `_PUBLIC_PATH_`: `auto` caused problems in practice; reproduce, find root causes (remoteEntry loaded via different base, nested chunks, WebView custom schemes, ...), test against all hosting variants, then decide D-12. Blocks UB-84 | FB, DOC | P1 | ⚠ | hosting §4 M-1 |
 
 Handoffs to UniversalBFF (owned and tracked there, listed for visibility):
 
@@ -121,7 +127,7 @@ U-Shell is in productive use.
 
 | ID | Item | Layers | Prio | Compat | Debt |
 |---|---|---|---|---|---|
-| UB-85 | Complete the public surface of `ushell-common-components` (`LocalWidgetHost`, `GuifadModule`, `EntityTableModule`, `EntitySelection`, `Dialog`, `Notification`, `LoadingScreen`, `ErrorScreen`, schema-editor, dashboard, card-board, `src/data` connectors); remove the shell's `dist/cjs` deep imports afterwards | CC, RF | P1 | additive | DD-04, DD-05 |
+`ErrorScreen`, schema-editor, dashboard, card-board, `src/data` connectors) and the public types consumers need for the exported components (`TableColumn`, `TableColors`, `ExpandableProps`, `LayoutDescriptionRoot`, `EntityLayout`, `FieldLayout`) plus filter helpers such as `getSelectedValues`; consumer modules currently import these from `dist/esm/...`; remove the shell's `dist/cjs` deep imports afterwards |
 | UB-86 | Keep modules addressable after loading instead of merging into one description; prerequisite for per-module overlays and an unambiguous `tryGetModuleBaseUrl` | RF | P1 | ⚠ | DD-06, DD-07, DD-08 |
 | UB-87 | Document and then align the UnitOfWork contract of the built-in widgets; additive alias for `rootEntityName` vs. `entityName`, never a rename | DOC, RF | P2 | alias | DD-02 |
 | UB-88 | Datastore-based variant beside `guifadFuse` so no widget takes a backend URL from the UnitOfWork; keep the old behavior while portfolios use it | CC, RF | P2 | alias | DD-03 |
@@ -145,6 +151,8 @@ U-Shell is in productive use.
 | D-09 | Exact set of host-bound values a host may supplement in `module.json`, and the mechanism (server-side overlay vs. separate host document) | UB-82, UniversalBFF |
 | D-10 | Canonical module layout (`module.json`, `ui/`, `api/v{n}/`) mandatory or recommended | UB-84 |
 | D-11 | Client-side refresh-token model (timing, storage, rotation) needed for seamless refresh; to be decided in AuthTokenHandling §32.2, not in U-Shell | UB-20, AuthTokenHandling |
+| D-12 | `publicPath` strategy for module bundles (`auto` vs. host replacement vs. runtime-set public path) | UB-84, UB-93 |
+| D-13 | Shape of the frontend AuthTokenManager: API, configuration location, rules for deriving RuntimeTags from claims + ApplicationScope (relation to `RuntimeTagsFromTokenScope`), which claim values go into the side channel | UB-26, UB-04, UB-22 |
 
 ## Suggested order
 
